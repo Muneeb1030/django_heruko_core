@@ -1,12 +1,6 @@
-# Gunicorn configuration file:
-# https://docs.gunicorn.org/en/stable/configure.html
-# https://docs.gunicorn.org/en/stable/settings.html
-#
-# Note: The classic Python buildpack currently sets a few gunicorn settings automatically via
-# the `GUNICORN_CMD_ARGS` env var (which take priority over the settings in this file):
-# https://github.com/heroku/heroku-buildpack-python/blob/main/vendor/python.gunicorn.sh
-
 import os
+import gevent.monkey
+gevent.monkey.patch_all()
 
 # The default `sync` worker is more suited to CPU/network-bandwidth bound workloads, so we
 # instead use the thread based worker type for improved support of blocking I/O workloads:
@@ -20,6 +14,9 @@ import os
 # do not exceed the maximum number of connections to external services such as DBs:
 # https://devcenter.heroku.com/articles/python-concurrency-and-database-connections
 worker_class = "gevent"
+worker_connections = 1000
+max_requests = int(os.getenv("MAX_REQUESTS", "1000"))
+max_requests_jitter = int(os.getenv("MAX_REQUESTS_JITTER", "200"))
 
 # gunicorn will start this many worker processes. The Python buildpack automatically sets a
 # default for WEB_CONCURRENCY at dyno boot, based on the number of CPUs and available RAM:
@@ -47,11 +44,18 @@ keepalive = 95
 
 # Enable logging of incoming requests to stdout.
 accesslog = "-"
+errorlog = "-"
 
 # Adjust which fields are included in the access log, and make it use the Heroku logfmt
 # style. The `X-Request-Id` and `X-Forwarded-For` headers are set by the Heroku Router:
 # https://devcenter.heroku.com/articles/http-routing#heroku-headers
 access_log_format = 'gunicorn method=%(m)s path="%(U)s" status=%(s)s duration=%(M)sms request_id=%({x-request-id}i)s fwd="%({x-forwarded-for}i)s" user_agent="%(a)s"'
+
+def on_starting(server):
+    server.log.info("Starting Gunicorn with Gevent workers")
+
+def worker_int(worker):
+    worker.log.info("Worker received interrupt signal")
 
 if os.environ.get("ENVIRONMENT") == "development":
     # Automatically restart gunicorn when the app source changes in development.
@@ -73,5 +77,3 @@ else:
     # are correctly marked as secure. This allows the WSGI app (in our case, Django) to distinguish
     # between HTTP and HTTPS requests for features like HTTP->HTTPS URL redirection.
     forwarded_allow_ips = "*"
-    max_requests = int(os.getenv("MAX_REQUESTS", "1000"))  # 0 disables
-    max_requests_jitter = int(os.getenv("MAX_REQUESTS_JITTER", "30"))

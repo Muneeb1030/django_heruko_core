@@ -1,8 +1,16 @@
 asgiref==3.9.1
+cffi==2.0.0
 Django==5.2.6
+gevent==25.9.1
+greenlet==3.2.4
+gunicorn==23.0.0
+packaging==25.0
+pycparser==2.23
 python-decouple==3.8
 pytz==2025.2
 setuptools==78.1.1
 sqlparse==0.5.3
 tzdata==2025.2
 wheel==0.45.1
+zope.event==6.0
+zope.interface==8.0
